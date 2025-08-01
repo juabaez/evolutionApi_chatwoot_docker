@@ -66,14 +66,28 @@ services:
       - POSTGRES_PASSWORD=evolution
     networks: 
       - evolution-network
+
+  postgres-n8n:
+    image: postgres:14
+    container_name: postgres-n8n
+    hostname: postgres-n8n
+    restart: always
+    volumes:
+      - ./database/n8n/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=nochon
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=n8n
+    networks: 
+      - evolution-network
   
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: chatwoot-pgadmin4
     hostname: chatwoot-pgadmin4
     environment:
-      PGADMIN_DEFAULT_EMAIL: "demo@demo.com.br"
-      PGADMIN_DEFAULT_PASSWORD: "PgAdmin2021!"
+      PGADMIN_DEFAULT_EMAIL: "calf.help@gmail.com"
+      PGADMIN_DEFAULT_PASSWORD: "Ternera2025!"
     depends_on:
       - postgres-chatwoot
     networks:
@@ -103,6 +117,19 @@ services:
       - ./database/evolution/redis:/data
     networks: 
       - evolution-network
+
+  redis-n8n:
+     image: redis:alpine
+     container_name: redis-n8n
+     hostname: redis-n8n
+     restart: always
+     command: [ "redis-server", "--appendonly", "yes", "--port", "6379" ]
+     env_file:
+      - ./evolution-api/.env
+     volumes:
+      - ./database/n8n/redis:/data
+     networks: 
+      - evolution-network
   
   evolution:
     image: atendai/evolution-api:v2.2.0
@@ -113,6 +140,67 @@ services:
       - evolution-network
     env_file:
       - ./evolution-api/.env
+
+  traefik:
+    image: traefik
+    container_name: traefik
+    restart: always
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
+      - "--certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./traefik_data:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - evolution-network
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    restart: always
+    ports:
+      - "127.0.0.1:5678:5678"
+    labels:
+      - traefik.enable=true
+      #- traefik.http.routers.n8n.rule=Host(`${SUBDOMAIN}.${DOMAIN_NAME}`)
+      - traefik.http.routers.n8n.rule=Host(`localhost`)
+      - traefik.http.routers.n8n.tls=true
+      - traefik.http.routers.n8n.entrypoints=web,websecure
+      - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
+      - traefik.http.middlewares.n8n.headers.SSLRedirect=true
+      - traefik.http.middlewares.n8n.headers.STSSeconds=315360000
+      - traefik.http.middlewares.n8n.headers.browserXSSFilter=true
+      - traefik.http.middlewares.n8n.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.n8n.headers.forceSTSHeader=true
+      - traefik.http.middlewares.n8n.headers.SSLHost=localhost
+      - traefik.http.middlewares.n8n.headers.STSIncludeSubdomains=true
+      - traefik.http.middlewares.n8n.headers.STSPreload=true
+      - traefik.http.routers.n8n.middlewares=n8n@docker
+    environment:
+      #- N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      #- N8N_PROTOCOL=https
+      - NODE_ENV=production
+      #- WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
+      - WEBHOOK_URL=https://localhost/
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+      - ./local-files:/files
+    networks:
+      - evolution-network
 
   nginx:
     build: 
@@ -133,3 +221,7 @@ networks:
   evolution-network:
     name: evolution-network
     driver: bridge
+
+volumes:
+  traefik_data:
+  n8n_data:

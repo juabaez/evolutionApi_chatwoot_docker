@@ -1,0 +1,51 @@
+services:
+  chatwoot-rails:
+    image: sendingtk/chatwoot:v3.12.6
+    container_name: chatwoot-rails
+    depends_on:
+      - postgres-chatwoot
+      - redis-chatwoot
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+    entrypoint: docker/entrypoints/rails.sh
+    command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
+    networks: 
+      - evolution-network
+
+  chatwoot-sidekiq:
+    image: sendingtk/chatwoot:v3.12.6
+    container_name: chatwoot-sidekiq
+    depends_on:
+      - postgres-chatwoot
+      - redis-chatwoot
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+    command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
+    networks: 
+      - evolution-network
+
+  postgres-chatwoot:
+    image: postgres:14
+    container_name: postgres-chatwoot
+    environment:
+      - POSTGRES_DB=chatwoot
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=chatwoot
+    volumes:
+      - ./database/chatwoot/postgres:/var/lib/postgresql/data
+    networks:
+      - evolution-network
+
+  redis-chatwoot:
+    image: redis:alpine
+    container_name: redis-chatwoot
+    command: ["sh", "-c", "redis-server --requirepass \"$REDIS_PASSWORD\""]
+    env_file: .env
+    volumes:
+      - ./database/chatwoot/redis:/data
+    networks: 
+      - evolution-network

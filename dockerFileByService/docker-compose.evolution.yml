@@ -1,0 +1,33 @@
+services:
+  evolution-api:
+    image: atendai/evolution-api:v2.2.0
+    container_name: evolution-api
+    volumes:
+      - ./evolution-api/evolution_instances:/evolution/instances
+    env_file:
+      - ./evolution-api/.env
+    networks:
+      - evolution-network
+
+  postgres-evolution:
+    image: postgres:14
+    container_name: postgres-evolution
+    volumes:
+      - ./database/evolution/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=evolution
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=evolution
+    networks:
+      - evolution-network
+
+  redis-evolution:
+    image: redis:alpine
+    container_name: redis-evolution
+    command: [ "redis-server", "--appendonly", "yes", "--port", "6379" ]
+    env_file:
+      - ./evolution-api/.env
+    volumes:
+      - ./database/evolution/redis:/data
+    networks:
+      - evolution-network
