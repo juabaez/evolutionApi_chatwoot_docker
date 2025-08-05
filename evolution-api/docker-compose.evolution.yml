@@ -5,7 +5,7 @@ services:
     volumes:
       - ./evolution-api/evolution_instances:/evolution/instances
     env_file:
-      - ./evolution-api/.env
+      - .env
     networks:
       - evolution-network
 
@@ -26,7 +26,7 @@ services:
     container_name: redis-evolution
     command: [ "redis-server", "--appendonly", "yes", "--port", "6379" ]
     env_file:
-      - ./evolution-api/.env
+      - .env
     volumes:
       - ./database/evolution/redis:/data
     networks:
